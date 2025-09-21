@@ -213,7 +213,7 @@ class CourseUnsubscriptionResponse(BaseModel):
     canvas_user_id: int
 
 @app.patch("/users/{canvas_user_id}/subscriptions/{canvas_course_id}", response_model=CourseUnsubscriptionResponse)
-async def unsubscribe_course(canvas_user_id: int, canvas_course_id: int):
+def unsubscribe_course(canvas_user_id: int, canvas_course_id: int):
     # user = await get_current_canvas_user()
     # if not user:
     #     raise HTTPException(status_code=401, detail="Unable to identify user")
@@ -249,7 +249,50 @@ async def unsubscribe_course(canvas_user_id: int, canvas_course_id: int):
                 course_code=subscription_data.course_code,
                 canvas_user_id=canvas_user_id
             )
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions as-is
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-# @app.get("/subscriptions")
+class Subscription(BaseModel):
+    canvas_course_id: int
+    course_name: str
+    course_code: str
+
+@app.get("/users/{canvas_user_id}/subscriptions", response_model=List[Subscription])
+def get_course_subscriptions(canvas_user_id: int):
+    """
+    Gets all of users' subscribed courses
+    """
+    try:
+        with db.engine.begin() as connection:
+            params = {
+                "canvas_user_id": canvas_user_id
+            }
+            result = connection.execute(
+                sqlalchemy.text(
+                    """
+                    SELECT canvas_course_id, course_name, course_code
+                    FROM course_subscriptions
+                    WHERE is_active = TRUE AND canvas_user_id = :canvas_user_id
+                    """
+                ),
+                params
+            ).all()
+
+            if not result:
+                return []
+            
+            subscriptions = [
+                Subscription(
+                    canvas_course_id=subscription.canvas_course_id,
+                    course_name=subscription.course_name,
+                    course_code=subscription.course_code
+                )
+                for subscription in result
+            ]
+
+            return subscriptions
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
