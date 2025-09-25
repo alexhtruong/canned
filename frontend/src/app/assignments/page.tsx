@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { FileText, Grid, List, RefreshCw } from "lucide-react"
 import type { DateRange } from "react-day-picker"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface Assignment {
   id: string
@@ -97,7 +97,6 @@ const availableCourses = [
 ]
 
 export default function AssignmentsPage() {
-  const { toast } = useToast()
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards")
   const [searchValue, setSearchValue] = useState("")
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
@@ -153,20 +152,18 @@ export default function AssignmentsPage() {
 
       return matchesSearch && matchesStatus && matchesCourse && matchesDateRange && matchesSubscribed
     })
-  }, [mockAssignments, searchValue, statusFilter, courseFilter, dateRangeFilter, subscribedOnlyFilter])
+  }, [searchValue, statusFilter, courseFilter, dateRangeFilter, subscribedOnlyFilter])
 
   const handleNotifyTest = (assignmentId: string) => {
     const assignment = mockAssignments.find((a) => a.id === assignmentId)
-    toast({
-      title: "Test notification sent",
+    toast.success("Test notification sent", {
       description: `Sent test notification for "${assignment?.name}"`,
     })
   }
 
   const handleCreateReminder = (assignmentId: string) => {
     const assignment = mockAssignments.find((a) => a.id === assignmentId)
-    toast({
-      title: "Reminder created",
+    toast.success("Reminder created", {
       description: `Created manual reminder for "${assignment?.name}"`,
     })
   }

@@ -7,17 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { BookOpen, ExternalLink, MoreHorizontal, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-interface Course {
-  id: string
-  code: string
-  name: string
-  term: string
-  status: "active" | "completed" | "upcoming"
-  subscribed: boolean
-  assignmentCount: number
-  canvasUrl: string
-}
+import { Course } from "@/types/types"
 
 interface CourseRowProps {
   course: Course
@@ -61,7 +51,7 @@ export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: C
             </div>
             <h3 className="font-medium text-foreground truncate">{course.name}</h3>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>{course.term}</span>
+              <span>{course.term?.name}</span>
               <span>{course.assignmentCount} assignments</span>
             </div>
           </div>

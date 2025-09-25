@@ -9,7 +9,7 @@ import { JobLegend } from "@/components/jobs/job-legend"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface Job {
   id: string
@@ -103,7 +103,6 @@ const mockJobs: Job[] = [
 ]
 
 export default function JobsPage() {
-  const { toast } = useToast()
   const [jobs, setJobs] = useState<Job[]>(mockJobs)
   const [activeTab, setActiveTab] = useState("due")
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -128,15 +127,12 @@ export default function JobsPage() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      toast({
-        title: "Jobs Refreshed",
+      toast.success("Jobs Refreshed", {
         description: "Job status has been updated from the cron runner",
       })
-    } catch (error) {
-      toast({
-        title: "Refresh Failed",
+    } catch {
+      toast.error("Refresh Failed", {
         description: "Unable to refresh job status. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsRefreshing(false)
@@ -161,16 +157,14 @@ export default function JobsPage() {
 
   const handleDelete = (jobId: string) => {
     setJobs((prev) => prev.filter((job) => job.id !== jobId))
-    toast({
-      title: "Job Deleted",
+    toast.success("Job Deleted", {
       description: "The job has been removed from the queue",
     })
   }
 
   const handleViewDetails = (jobId: string) => {
     const job = jobs.find((j) => j.id === jobId)
-    toast({
-      title: "Job Details",
+    toast.success("Job Details", {
       description: `Viewing details for job ${job?.id} - ${job?.assignmentName}`,
     })
   }

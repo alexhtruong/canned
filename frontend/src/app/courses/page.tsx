@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { TopNav } from "@/components/layout/top-nav"
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
@@ -10,79 +10,81 @@ import { BulkActions } from "@/components/courses/bulk-actions"
 import { EmptyState } from "@/components/dashboard/empty-state"
 import { Button } from "@/components/ui/button"
 import { BookOpen, RefreshCw } from "lucide-react"
-
-interface Course {
-  id: string
-  code: string
-  name: string
-  term: string
-  status: "active" | "completed" | "upcoming"
-  subscribed: boolean
-  assignmentCount: number
-  canvasUrl: string
-}
-
-// Mock data - in real app this would come from API
-const mockCourses: Course[] = [
-  {
-    id: "1",
-    code: "CPE-365",
-    name: "Database Systems",
-    term: "Fall 2024",
-    status: "active",
-    subscribed: true,
-    assignmentCount: 8,
-    canvasUrl: "#",
-  },
-  {
-    id: "2",
-    code: "CPE-308",
-    name: "Software Engineering",
-    term: "Fall 2024",
-    status: "active",
-    subscribed: true,
-    assignmentCount: 12,
-    canvasUrl: "#",
-  },
-  {
-    id: "3",
-    code: "CPE-466",
-    name: "Knowledge Discovery from Data",
-    term: "Fall 2024",
-    status: "active",
-    subscribed: false,
-    assignmentCount: 6,
-    canvasUrl: "#",
-  },
-  {
-    id: "4",
-    code: "CPE-349",
-    name: "Design & Analysis of Algorithms",
-    term: "Fall 2024",
-    status: "active",
-    subscribed: true,
-    assignmentCount: 10,
-    canvasUrl: "#",
-  },
-  {
-    id: "5",
-    code: "CPE-357",
-    name: "Systems Programming",
-    term: "Winter 2024",
-    status: "completed",
-    subscribed: false,
-    assignmentCount: 15,
-    canvasUrl: "#",
-  },
-]
+import { Course } from "@/types/types"
 
 export default function CoursesPage() {
   const router = useRouter()
-  const [courses, setCourses] = useState<Course[]>(mockCourses)
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState("")
   const [termFilter, setTermFilter] = useState<string | null>(null)
   const [subscribedFilter, setSubscribedFilter] = useState<boolean | null>(null)
   const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set())
+  
+  const fetchCourses = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${apiUrl}/courses`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+            
+      if (!response.ok) {
+        throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+
+      console.log(data)
+      const isCourseActive = (startDate: string) => {
+        const currentDate = new Date();
+        const courseStartDate = new Date(startDate);
+
+        // Calculate the difference in milliseconds
+        const timeDifference = currentDate.getTime() - courseStartDate.getTime();
+
+        // Convert to weeks (1 week = 7 days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
+        const weeksDifference = timeDifference / (7 * 24 * 60 * 60 * 1000); 
+
+        return weeksDifference < 10;
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transformedCourses = data.map((course: any) => {
+        let courseStatus: "active" | "completed" = "completed"
+        const startDate = course.term?.start_at
+        if (startDate && course.id && course.course_code) {
+          const isActive = isCourseActive(startDate)
+          courseStatus = isActive ? "active" : "completed";
+        }
+
+        return {
+          id: course.id.toString(), // Convert to string if needed
+          code: course.course_code || "UNKNOWN",
+          name: course.name,
+          term: course.term, // This should now match {id: number, name: string}
+          status: courseStatus, // You'll need to determine this based on your logic
+          subscribed: false, // You'll need to get this from your subscription API
+          assignmentCount: 0, // You'll need to get this from assignments API
+          canvasUrl: `https://canvas.instructure.com/courses/${course.id}` // Construct Canvas URL
+        }
+      });
+      setCourses(transformedCourses);
+    } catch (err) {
+      setError(`An unexpected error occured: ${err}`)
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
 
   // Filter courses based on search and filters
   const filteredCourses = useMemo(() => {
@@ -92,10 +94,46 @@ export default function CoursesPage() {
         course.name.toLowerCase().includes(searchValue.toLowerCase()) ||
         course.code.toLowerCase().includes(searchValue.toLowerCase())
 
-      const matchesTerm = termFilter === null || course.term === termFilter
+      const matchesTerm = termFilter === null || course.term?.name === termFilter
       const matchesSubscribed = subscribedFilter === null || course.subscribed === subscribedFilter
 
       return matchesSearch && matchesTerm && matchesSubscribed
+    })
+    .sort((a, b) => {
+      // Sort by term chronologically (most recent first)
+      const termA = a.term?.name || ""
+      const termB = b.term?.name || ""
+      
+      // If either course has no term, put it at the end
+      if (!termA && !termB) return 0
+      if (!termA) return 1
+      if (!termB) return -1
+      
+      // Parse term strings like "Fall Quarter 2024"
+      const parseTermDate = (termName: string) => {
+        const match = termName.match(/(\w+)\s+Quarter\s+(\d{4})/)
+        if (!match) return new Date(0) // Invalid terms go to bottom
+        
+        const [, season, year] = match
+        const yearNum = parseInt(year)
+        
+        // Map seasons to months for chronological ordering
+        const seasonToMonth: Record<string, number> = {
+          'Winter': 1,   // Jan-Mar (start of year)
+          'Spring': 4,   // Apr-Jun  
+          'Summer': 7,   // Jul-Sep
+          'Fall': 10     // Oct-Dec (end of year)
+        }
+        
+        const month = seasonToMonth[season] || 0
+        return new Date(yearNum, month - 1) // month is 0-based in Date constructor
+      }
+      
+      const dateA = parseTermDate(termA)
+      const dateB = parseTermDate(termB)
+      
+      // Sort in descending order (most recent first)
+      return dateB.getTime() - dateA.getTime()
     })
   }, [courses, searchValue, termFilter, subscribedFilter])
 
@@ -144,8 +182,8 @@ export default function CoursesPage() {
               <h1 className="text-3xl font-bold tracking-tight text-balance">Courses</h1>
               <p className="text-muted-foreground text-pretty">Manage your Canvas course subscriptions</p>
             </div>
-            <Button variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button variant="outline" onClick={fetchCourses} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Sync from Canvas
             </Button>
           </div>
@@ -175,7 +213,24 @@ export default function CoursesPage() {
           )}
 
           {/* Course List */}
-          {filteredCourses.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">Loading courses...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border bg-card shadow-sm">
+              <EmptyState
+                icon={BookOpen}
+                title="Failed to load courses"
+                description={error}
+                actionLabel="Try Again"
+                onAction={fetchCourses}
+              />
+            </div>
+          ) : filteredCourses.length > 0 ? (
             <div className="space-y-4">
               {filteredCourses.map((course) => (
                 <CourseRow
@@ -193,7 +248,7 @@ export default function CoursesPage() {
                 title="No courses found"
                 description="No courses match your current filters. Try adjusting your search or filters, or sync from Canvas to load your courses."
                 actionLabel="Sync from Canvas"
-                onAction={() => console.log("Sync from Canvas")}
+                onAction={fetchCourses}
               />
             </div>
           )}

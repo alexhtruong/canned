@@ -7,8 +7,8 @@ import { LogFilters } from "@/components/logs/log-filters"
 import { LogTable } from "@/components/logs/log-table"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
+import { toast } from "sonner"
 import type { DateRange } from "react-day-picker"
-import { useToast } from "@/hooks/use-toast"
 
 interface NotificationLog {
   id: string
@@ -116,7 +116,6 @@ const mockLogs: NotificationLog[] = [
 ]
 
 export default function LogsPage() {
-  const { toast } = useToast()
   const [logs] = useState<NotificationLog[]>(mockLogs)
   const [searchValue, setSearchValue] = useState("")
   const [channelFilter, setChannelFilter] = useState<string | null>(null)
@@ -157,15 +156,13 @@ export default function LogsPage() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      toast({
-        title: "Logs Refreshed",
+      toast.success("Logs Refreshed",{
         description: "Notification logs have been updated",
       })
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      toast({
-        title: "Refresh Failed",
+      toast.error("Refresh Failed", {
         description: "Unable to refresh logs. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsRefreshing(false)
@@ -173,8 +170,7 @@ export default function LogsPage() {
   }
 
   const handleExportCsv = () => {
-    toast({
-      title: "Export Complete",
+    toast.success("Export Complete", {
       description: `Exported ${filteredLogs.length} notification logs to CSV`,
     })
   }

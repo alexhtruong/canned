@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ExternalLink, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Info } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface CanvasConnectionProps {
   onSave: (settings: CanvasSettings) => void
@@ -23,7 +23,6 @@ interface CanvasSettings {
 }
 
 export function CanvasConnection({ onSave, initialSettings }: CanvasConnectionProps) {
-  const { toast } = useToast()
   const [settings, setSettings] = useState<CanvasSettings>(
     initialSettings || {
       baseUrl: "",
@@ -44,10 +43,8 @@ export function CanvasConnection({ onSave, initialSettings }: CanvasConnectionPr
 
   const testConnection = async () => {
     if (!settings.baseUrl || !settings.accessToken) {
-      toast({
-        title: "Missing Information",
+      toast.error("Missing Information", {
         description: "Please provide both Canvas URL and access token",
-        variant: "destructive",
       })
       return
     }
@@ -68,16 +65,13 @@ export function CanvasConnection({ onSave, initialSettings }: CanvasConnectionPr
       })
 
       setConnectionStatus("success")
-      toast({
-        title: "Connection Successful",
+      toast.success("Connection Successful", {
         description: "Successfully connected to Canvas LMS",
       })
-    } catch (error) {
+    } catch {
       setConnectionStatus("error")
-      toast({
-        title: "Connection Failed",
+      toast.error("Connection Failed", {
         description: "Unable to connect to Canvas. Please check your settings.",
-        variant: "destructive",
       })
     } finally {
       setIsTestingConnection(false)
@@ -87,8 +81,7 @@ export function CanvasConnection({ onSave, initialSettings }: CanvasConnectionPr
   const handleSave = () => {
     onSave(settings)
     setHasChanges(false)
-    toast({
-      title: "Settings Saved",
+    toast.success("Settings Saved", {
       description: "Canvas connection settings have been updated",
     })
   }

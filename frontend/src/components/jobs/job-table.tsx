@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, RotateCcw, Trash2, Eye, Clock, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface Job {
   id: string
@@ -39,7 +39,6 @@ const statusStyles = {
 }
 
 export function JobTable({ jobs, onRequeue, onDelete, onViewDetails }: JobTableProps) {
-  const { toast } = useToast()
   const [processingJobs, setProcessingJobs] = useState<Set<string>>(new Set())
 
   const handleRequeue = async (jobId: string) => {
@@ -48,15 +47,12 @@ export function JobTable({ jobs, onRequeue, onDelete, onViewDetails }: JobTableP
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000))
       onRequeue(jobId)
-      toast({
-        title: "Job Requeued",
+      toast.success("Job Requeued", {
         description: "The job has been added back to the queue",
       })
-    } catch (error) {
-      toast({
-        title: "Requeue Failed",
+    } catch {
+      toast.error("Requeue Failed", {
         description: "Unable to requeue the job. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setProcessingJobs((prev) => {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Search, X } from "lucide-react"
+import { attachReactRefresh } from "next/dist/build/webpack-config"
 
 interface CourseFiltersProps {
   onSearchChange: (search: string) => void
@@ -14,7 +15,45 @@ interface CourseFiltersProps {
   subscribedFilter: boolean | null
 }
 
-const terms = ["Fall 2024", "Winter 2024", "Spring 2024", "Summer 2024"]
+function generateTerms(): string[] {
+  const terms: string[] = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // getMonth() returns 0-11
+  
+  // Determine current quarter based on month
+  let currentQuarter: number;
+  if (currentMonth >= 1 && currentMonth <= 3) {
+    currentQuarter = 1; // Winter
+  } else if (currentMonth >= 4 && currentMonth <= 6) {
+    currentQuarter = 2; // Spring  
+  } else if (currentMonth >= 7 && currentMonth <= 9) {
+    currentQuarter = 3; // Summer
+  } else {
+    currentQuarter = 4; // Fall
+  }
+  
+  const quarterNames = ["Winter", "Spring", "Summer", "Fall"];
+  
+  // Generate current + past 3 quarters (4 total)
+  for (let i = 0; i < 4; i++) {
+    let quarterIndex = currentQuarter - 1 - i; // Convert to 0-based index
+    let year = currentYear;
+    
+    // Handle year rollover
+    if (quarterIndex < 0) {
+      quarterIndex += 4; // Wrap around (e.g., -1 becomes 3)
+      year -= 1;
+    }
+    
+    const quarterName = quarterNames[quarterIndex];
+    terms.push(`${quarterName} Quarter ${year}`);
+  }
+  
+  return terms;
+}
+
+const terms = generateTerms();
 
 export function CourseFilters({
   onSearchChange,

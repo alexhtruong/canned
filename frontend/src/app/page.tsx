@@ -1,8 +1,10 @@
+"use client"
 import { TopNav } from "@/components/layout/top-nav"
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { AssignmentTimeline } from "@/components/dashboard/assignment-timeline"
 import { AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function DashboardPage() {
   return (

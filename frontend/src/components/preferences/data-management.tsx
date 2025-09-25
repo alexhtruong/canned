@@ -17,7 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { RefreshCw, Database, Trash2, Calendar, AlertTriangle } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface DataManagementProps {
   onSync: () => void
@@ -26,7 +26,6 @@ interface DataManagementProps {
 }
 
 export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataManagementProps) {
-  const { toast } = useToast()
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
@@ -37,15 +36,12 @@ export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataM
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 3000))
       onSync()
-      toast({
-        title: "Sync Complete",
+      toast.success("Sync Complete", {
         description: "Successfully synced courses and assignments from Canvas",
       })
-    } catch (error) {
-      toast({
-        title: "Sync Failed",
+    } catch {
+      toast.error("Sync Failed", {
         description: "Unable to sync data from Canvas. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsSyncing(false)
@@ -57,15 +53,12 @@ export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataM
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500))
       onRescheduleJobs()
-      toast({
-        title: "Jobs Rescheduled",
+      toast.success("Jobs Rescheduled", {
         description: "All pending notification jobs have been rescheduled",
       })
-    } catch (error) {
-      toast({
-        title: "Reschedule Failed",
+    } catch {
+      toast.error("Reschedule Failed", {
         description: "Unable to reschedule jobs. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsRescheduling(false)
@@ -77,15 +70,12 @@ export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataM
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000))
       onClearCache()
-      toast({
-        title: "Cache Cleared",
+      toast.success("Cache Cleared", {
         description: "All cached data has been cleared successfully",
       })
-    } catch (error) {
-      toast({
-        title: "Clear Failed",
+    } catch {
+      toast.error("Clear Failed", {
         description: "Unable to clear cache. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsClearing(false)
@@ -170,7 +160,7 @@ export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataM
                   Clear Cache
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will clear all cached course and assignment data. You'll need to sync from Canvas again to
+                  This will clear all cached course and assignment data. You&apos;ll need to sync from Canvas again to
                   restore your data. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -190,7 +180,7 @@ export function DataManagement({ onSync, onRescheduleJobs, onClearCache }: DataM
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Warning: Clearing cache will remove all locally stored data. Use this only if you're experiencing sync
+              Warning: Clearing cache will remove all locally stored data. Use this only if you&apos;re experiencing sync
               issues.
             </AlertDescription>
           </Alert>

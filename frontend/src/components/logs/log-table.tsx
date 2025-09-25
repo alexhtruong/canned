@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { MessageSquare, Mail, Bell, CheckCircle, XCircle, Clock, Copy } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface NotificationLog {
   id: string
@@ -52,12 +52,9 @@ const resultIcons = {
 }
 
 export function LogTable({ logs }: LogTableProps) {
-  const { toast } = useToast()
-
   const copyMessageId = (messageId: string) => {
     navigator.clipboard.writeText(messageId)
-    toast({
-      title: "Copied",
+    toast.success("Copied", {
       description: "Message ID copied to clipboard",
     })
   }

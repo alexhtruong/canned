@@ -1,9 +1,10 @@
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 import requests
 from src.config import get_settings
 from pydantic import BaseModel, Field
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import sqlalchemy
 from src import database as db
 from src.session import session
@@ -16,7 +17,6 @@ app = FastAPI(
     title="Canned",
     description=description,
     version="0.0.1",
-    terms_of_service="http://example.com/terms/",
     contact={
         "name": "Alex Truong",
         "email": "atruon68@calpoly.edu",
@@ -24,7 +24,13 @@ app = FastAPI(
 )
 
 # TODO: add prod links
-origins = ["http://localhost", "http://localhost:8000"]
+origins = [
+    "http://localhost",
+    "http://localhost:3000",  # Next.js default dev port
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",  # Alternative localhost format
+    "http://127.0.0.1:8000"
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +38,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 settings = get_settings()
@@ -40,43 +47,73 @@ settings = get_settings()
 async def root():
     return {"message": "Welcome to Canned!"}
 
+class Term(BaseModel):
+    id: int
+    name: str    # "Fall Quarter 2023"
+    start_at: datetime
+    # Omitting: start_at, end_at, created_at, workflow_state, grading_period_group_id
+
 class Course(BaseModel):
     id: int
-    uuid: str | None = None
     name: str = "Unnamed Course"
     course_code: str = "UNKNOWN"
+    term: Term | None = None
 
-async def fetch_canvas_courses() -> Tuple[List[dict], int]:
+def fetch_canvas_paginated(endpoint: str, include_params: List[str]) -> Tuple[List[dict], int]:
+    all_items = []
+    page = 1
+    per_page = 100
+    final_status_code = 200
+
+    while True:
+        params = {
+            "page": page,
+            "per_page": per_page
+        }
+
+        if include_params:
+            params["include[]"] = include_params
+        
+        try:
+            response = session.get(
+                f"{settings.CANVAS_BASE_URL}{endpoint}",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            final_status_code = response.status_code
+            
+            items_page = response.json()
+            if not items_page:
+                break
+
+            all_items.extend(items_page)
+
+            link_header = response.headers.get('Link', '')
+            if 'rel="next"' not in link_header:
+                break
+                
+            page += 1
+        except Exception as e:
+            print(e)
+            raise
+    
+    return all_items, final_status_code
+
+def fetch_canvas_courses() -> Tuple[List[dict], int]:
     """
     Gets user's entire collection of canvas courses.\n
     Returns a list of courses and the HTTP response status code
     """
-    all_courses = []
-    page = 1
-    per_page = 100
-    
-    while True:
-        params = {"page": page, "per_page": per_page}
-        response = session.get(
-            f"{settings.CANVAS_BASE_URL}/api/v1/courses",
-            params=params,
-            timeout=30
+    try:
+        all_courses, status_code = fetch_canvas_paginated(
+            endpoint="/api/v1/courses", 
+            include_params=["term"]
         )
-        response.raise_for_status()
-        courses_page = response.json()
-        
-        if not courses_page:
-            break
-            
-        all_courses.extend(courses_page)
-        
-        link_header = response.headers.get('Link', '')
-        if 'rel="next"' not in link_header:
-            break
-            
-        page += 1
-    
-    return all_courses, response.status_code
+        return all_courses, status_code
+    except Exception as e:
+        print(f"Error fetching Canvas courses: {e}")
+        raise
 
 async def get_current_canvas_user() -> dict:
     """Get the user associated with the current PAT"""
@@ -92,6 +129,7 @@ async def get_current_canvas_user() -> dict:
         else:
             raise HTTPException(status_code=500, detail=f"Canvas API error: {e}")
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Failed to get current user: {str(e)}")
 
 @app.get("/courses", response_model=List[Course])
@@ -100,40 +138,45 @@ async def get_courses() -> List[Course]:
     Get's the user's canvas courses and formats data appropriately
     """
     try:
-        raw_courses, response = await fetch_canvas_courses()
+        raw_courses, response_status = fetch_canvas_courses()
         
         course_objects = []
         for course in raw_courses:
-            id = course.get("id")
-            uuid = course.get("uuid")
-            name = course.get("name")
-            course_code = course.get("course_code")
-            
-            if not (uuid and name and course_code):
-                continue
+            try:
+                # Check required fields exist (allow falsy values except None)
+                if course.get("id") is None or course.get("name") is None:
+                    print(f"Skipping course - missing required fields: {course.get('id', 'NO_ID')}")
+                    continue
+
+                # Extract and validate term data
+                term_obj = None
+                if course.get("term"):
+                    term_data = course["term"]
+                    if term_data.get("id") and term_data.get("name") and term_data.get("start_at"):
+                        term_obj = Term(
+                            id=term_data["id"],
+                            name=term_data["name"],
+                            start_at=term_data["start_at"]
+                        )
+
+                # Create course object with explicit field mapping
+                course_obj = Course(
+                    id=course["id"],
+                    name=course["name"],
+                    course_code=course.get("course_code", "UNKNOWN"),
+                    term=term_obj
+                )
+                course_objects.append(course_obj)
                 
-            course_obj = Course(id=id, uuid=uuid, name=name, course_code=course_code)
-            course_objects.append(course_obj)
+            except Exception as e:
+                print(f"Error processing course {course.get('id', 'unknown')}: {e}")
+                continue  # Skip this course but continue with others
         
         return course_objects
-    except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="Canvas API request timed out")
-    except requests.exceptions.ConnectionError:
-        raise HTTPException(status_code=503, detail="Unable to connect to Canvas API")
-    except requests.exceptions.HTTPError as e:
-        if hasattr(e, 'response') and e.response is not None:
-            status_code = e.response.status_code
-            if status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid Canvas API token")
-            elif status_code == 403:
-                raise HTTPException(status_code=403, detail="Access denied to Canvas API")
-            else:
-                raise HTTPException(status_code=status_code, detail=f"Canvas API error: {e}")
-        else:
-            raise HTTPException(status_code=500, detail=f"HTTP error: {e}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        return HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}") 
     
 class CourseSubscriptionRequest(BaseModel):
@@ -152,7 +195,7 @@ async def subscribe_course(canvas_user_id: int, subscription_request: CourseSubs
     """
     Subscribes a user to a specific course given its id(currently only adds it to db table)
     """
-    raw_courses, _ = await fetch_canvas_courses()
+    raw_courses, _ = fetch_canvas_courses()
     course_data = next((course for course in raw_courses if course["id"] == subscription_request.canvas_course_id), None)
     if not course_data:
         raise HTTPException(status_code=400, detail="Course not found or you are not enrolled")
@@ -160,7 +203,7 @@ async def subscribe_course(canvas_user_id: int, subscription_request: CourseSubs
     # Skip user validation - its just me
     # user = await get_current_canvas_user()  # Remove this
     # if not user:  # Remove this
-    #     raise HTTPException(status_code=401, detail="Unable to identify user")  # Remove this
+    # raise HTTPException(status_code=401, detail="Unable to identify user")  # Remove this
     
     course_name = course_data.get("name")
     course_code = course_data.get("course_code")
@@ -202,6 +245,7 @@ async def subscribe_course(canvas_user_id: int, subscription_request: CourseSubs
     except sqlalchemy.exc.IntegrityError:
         raise HTTPException(status_code=409, detail="Already subscribed to this course")
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
@@ -216,7 +260,7 @@ class CourseUnsubscriptionResponse(BaseModel):
 def unsubscribe_course(canvas_user_id: int, canvas_course_id: int):
     # user = await get_current_canvas_user()
     # if not user:
-    #     raise HTTPException(status_code=401, detail="Unable to identify user")
+    # raise HTTPException(status_code=401, detail="Unable to identify user")
     
     try:
         with db.engine.begin() as connection:
@@ -250,8 +294,9 @@ def unsubscribe_course(canvas_user_id: int, canvas_course_id: int):
                 canvas_user_id=canvas_user_id
             )
     except HTTPException:
-        raise  # Re-raise HTTPExceptions as-is
+        raise    # Re-raise HTTPExceptions as-is
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 class Subscription(BaseModel):
@@ -295,4 +340,5 @@ def get_course_subscriptions(canvas_user_id: int):
             return subscriptions
         
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
