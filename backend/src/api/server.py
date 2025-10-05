@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import get_settings
-from src.api.routers import courses, subscriptions
+from src.api.routers import courses, subscriptions, canvas
 
 description = """
 im canned
@@ -43,3 +43,4 @@ async def root():
 
 app.include_router(courses.router)
 app.include_router(subscriptions.router)
+app.include_router(canvas.router)
