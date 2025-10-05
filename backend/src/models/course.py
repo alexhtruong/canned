@@ -10,7 +10,7 @@ class Term(BaseModel):
     """Represents a Canvas term (e.g., 'Fall Quarter 2023')."""
     id: int
     name: str    # "Fall Quarter 2023"
-    start_at: datetime
+    start_at: Optional[datetime]
     # Omitting: start_at, end_at, created_at, workflow_state, grading_period_group_id
 
 

@@ -1,55 +1,59 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
-
-import requests
-from backend.src.utils.canvas import fetch_canvas_courses
 from src.models.course import Course, Term
+import src.database as db
+import sqlalchemy
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 @router.get("", response_model=List[Course])
-async def get_courses() -> List[Course]:
+async def get_courses(canvas_user_id: int = 1) -> List[Course]:
     """
-    Get's the user's canvas courses and formats data appropriately
+    Get's the user's canvas courses from the local db
     """
     try:
-        raw_courses, response_status = fetch_canvas_courses()
+        denormalized_courses = fetch_courses_from_db(canvas_user_id)
+        if not denormalized_courses:
+            return []
         
-        course_objects = []
-        for course in raw_courses:
-            try:
-                # Check required fields exist (allow falsy values except None)
-                if course.get("id") is None or course.get("name") is None:
-                    print(f"Skipping course - missing required fields: {course.get('id', 'NO_ID')}")
-                    continue
-
-                # Extract and validate term data
-                term_obj = None
-                if course.get("term"):
-                    term_data = course["term"]
-                    if term_data.get("id") and term_data.get("name") and term_data.get("start_at"):
-                        term_obj = Term(
-                            id=term_data["id"],
-                            name=term_data["name"],
-                            start_at=term_data["start_at"]
-                        )
-
-                # Create course object with explicit field mapping
-                course_obj = Course(
-                    id=course["id"],
-                    name=course["name"],
-                    course_code=course.get("course_code", "UNKNOWN"),
-                    term=term_obj
-                )
-                course_objects.append(course_obj)
-                
-            except Exception as e:
-                print(f"Error processing course {course.get('id', 'unknown')}: {e}")
-                continue  # Skip this course but continue with others
-        
-        return course_objects
-    except requests.exceptions.RequestException as e:
-        return HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        normalized_courses = normalize_courses(denormalized_courses)
+        return normalized_courses
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}") 
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve courses")    
+
+def fetch_courses_from_db(canvas_user_id: int):
+    with db.engine.begin() as connection:
+        result = connection.execute(
+            sqlalchemy.text("""
+                SELECT canvas_course_id, course_name, course_code, term_id, term_name, term_start_at, is_completed
+                FROM user_courses
+                WHERE canvas_user_id = :canvas_user_id
+            """),
+            {"canvas_user_id": canvas_user_id}
+        ).all()
+        
+        return result
+
+def normalize_courses(courses) -> List[Course]:
+    """Transform database rows into Course objects."""
+    result = []
+    
+    for course in courses:
+        term = None
+        if course.term_id:
+            term = Term(
+                id=course.term_id,
+                name=course.term_name,
+                start_at=course.term_start_at
+            )
+        
+        course_obj = Course(
+            id=course.canvas_course_id,
+            name=course.course_name,
+            course_code=course.course_code,
+            term=term
+        )
+        result.append(course_obj)
+    
+    return result
