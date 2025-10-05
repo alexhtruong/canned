@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("course_name", sa.String, nullable=False),
         sa.Column("course_code", sa.String, nullable=False),
         sa.Column("term_id", sa.Integer),
-        sa.Column("term_name", sa.Integer),
+        sa.Column("term_name", sa.String),
         sa.Column("term_start_at", sa.DateTime),
         sa.Column("is_completed", sa.Boolean, default=True),
         sa.UniqueConstraint("canvas_user_id", "canvas_course_id", name="unique_user_course_enrollment"),
