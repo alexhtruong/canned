@@ -51,7 +51,7 @@ def bulk_upsert_courses(canvas_user_id: int, courses: List[Course]) -> int:
     ]
     
     with db.engine.begin() as connection:
-        # Build bulk INSERT OR REPLACE with
+        # Build and execute bulk INSERT OR REPLACE for user_courses table
         connection.execute(
             sqlalchemy.text("""
                 INSERT OR REPLACE INTO user_courses 
