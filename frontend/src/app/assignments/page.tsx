@@ -83,7 +83,11 @@ export default function AssignmentsPage() {
   useEffect(() => {
     const loadAssignments = async () => {
       const assignments = await fetchAssignments()
-      setAssignments(transformAssignments(assignments))
+      if (assignments) {
+        setAssignments(transformAssignments(assignments))
+      } else {
+        setAssignments([])
+      }
     }
     loadAssignments()
   }, []);
