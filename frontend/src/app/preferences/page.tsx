@@ -15,8 +15,25 @@ export default function PreferencesPage() {
     console.log("Saving Canvas settings:", settings)
   }
 
-  const handleSync = () => {
-    console.log("Syncing data from Canvas")
+  const handleSync = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiUrl}/canvas/sync?canvas_user_id=1`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(data)
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   const handleRescheduleJobs = () => {

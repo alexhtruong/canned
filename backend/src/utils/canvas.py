@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 from fastapi import HTTPException
 import requests
@@ -7,20 +7,26 @@ from src.config import get_settings
 
 settings = get_settings()
 
-def fetch_canvas_paginated(endpoint: str, include_params: List[str]) -> Tuple[List[dict], int]:
+def fetch_canvas_paginated(
+    endpoint: str,
+    include_params: Optional[List[str]],
+    **extra_params: Any     
+) -> Tuple[List[dict], int]:
     all_items = []
     page = 1
     per_page = 100
     final_status_code = 200
 
     while True:
-        params = {
+        params: Dict[str, Any] = {
             "page": page,
             "per_page": per_page
         }
 
         if include_params:
             params["include[]"] = include_params
+        
+        params.update(extra_params)
         
         try:
             response = session.get(
@@ -47,6 +53,18 @@ def fetch_canvas_paginated(endpoint: str, include_params: List[str]) -> Tuple[Li
             raise
     
     return all_items, final_status_code
+
+def fetch_canvas_assignments_for_class(course_id: int) -> Tuple[List[dict], int]:
+    try:
+        assignments, status_code = fetch_canvas_paginated(
+            endpoint=f"/api/v1/courses/{course_id}/assignments",
+            include_params=["submission"],
+            order_by="due_at"
+        )
+        return assignments, status_code
+    except Exception as e:
+        print(f"Error fetching canvas assignments for course {course_id}: {e}")
+        raise
 
 def fetch_canvas_courses() -> Tuple[List[dict], int]:
     """
@@ -79,3 +97,4 @@ async def get_current_canvas_user() -> dict:
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"Failed to get current user: {str(e)}")
+    
