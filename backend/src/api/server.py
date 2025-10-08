@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from src.api.routers import assignments
 from src.config import get_settings
 from src.api.routers import courses, subscriptions, canvas
 
@@ -44,3 +45,4 @@ async def root():
 app.include_router(courses.router)
 app.include_router(subscriptions.router)
 app.include_router(canvas.router)
+app.include_router(assignments.router)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { TopNav } from "@/components/layout/top-nav"
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
 import { AssignmentFilters } from "@/components/assignments/assignment-filters"
@@ -23,71 +23,9 @@ interface Assignment {
   points: number
   canvasUrl: string
   description?: string
-  courseSubscribed: boolean
 }
 
-// Mock data
-const mockAssignments: Assignment[] = [
-  {
-    id: "1",
-    name: "Database Design Project Phase 2",
-    courseCode: "CPE-365",
-    courseName: "Database Systems",
-    dueDate: "2024-01-15T23:59:00",
-    submitted: false,
-    points: 100,
-    canvasUrl: "#",
-    description: "Design and implement the second phase of the database project including normalization and indexing.",
-    courseSubscribed: true,
-  },
-  {
-    id: "2",
-    name: "React Component Library Documentation",
-    courseCode: "CPE-308",
-    courseName: "Software Engineering",
-    dueDate: "2024-01-15T23:59:00",
-    submitted: true,
-    points: 50,
-    canvasUrl: "#",
-    description: "Create comprehensive documentation for the React component library.",
-    courseSubscribed: true,
-  },
-  {
-    id: "3",
-    name: "Machine Learning Midterm",
-    courseCode: "CPE-466",
-    courseName: "Knowledge Discovery from Data",
-    dueDate: "2024-01-16T14:00:00",
-    submitted: false,
-    points: 200,
-    canvasUrl: "#",
-    courseSubscribed: false,
-  },
-  {
-    id: "4",
-    name: "Algorithm Analysis Report",
-    courseCode: "CPE-349",
-    courseName: "Design & Analysis of Algorithms",
-    dueDate: "2024-01-18T23:59:00",
-    submitted: false,
-    points: 75,
-    canvasUrl: "#",
-    description: "Analyze the time and space complexity of various sorting algorithms.",
-    courseSubscribed: true,
-  },
-  {
-    id: "5",
-    name: "Systems Programming Lab 3",
-    courseCode: "CPE-357",
-    courseName: "Systems Programming",
-    dueDate: "2024-01-10T23:59:00",
-    submitted: false,
-    points: 60,
-    canvasUrl: "#",
-    courseSubscribed: false,
-  },
-]
-
+// TODO: UPDATE
 const availableCourses = [
   { id: "1", code: "CPE-365", name: "Database Systems" },
   { id: "2", code: "CPE-308", name: "Software Engineering" },
@@ -99,14 +37,60 @@ const availableCourses = [
 export default function AssignmentsPage() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards")
   const [searchValue, setSearchValue] = useState("")
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [courseFilter, setCourseFilter] = useState<string[]>([])
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
   const [subscribedOnlyFilter, setSubscribedOnlyFilter] = useState(false)
 
+  const fetchAssignments = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    try {
+      const response = await fetch(`${apiUrl}/assignments?canvas_user_id=1`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log(data)
+      return data
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const transformAssignments = (data: any[]) => {
+    return data.map((assignment: any) => {
+      const courseCodeAndName = assignment.course_name.split(" - ", 2)
+      const courseCode = courseCodeAndName[0];
+      const courseName = courseCodeAndName[1];
+
+      return {
+        id: assignment.id.toString(),
+        name: assignment.name,
+        courseCode: courseCode,
+        courseName: courseName,
+        dueDate: assignment.due_at,
+        submitted: assignment.submission.submitted_at ? true : false,
+        points: assignment.points_possible,
+        canvasUrl: assignment.html_url,
+        description: assignment.description
+      }
+    });
+  }
+
+  useEffect(() => {
+    const loadAssignments = async () => {
+      const assignments = await fetchAssignments()
+      setAssignments(transformAssignments(assignments))
+    }
+    loadAssignments()
+  }, []);
+  
   // Filter assignments
   const filteredAssignments = useMemo(() => {
-    return mockAssignments.filter((assignment) => {
+    return assignments.filter((assignment) => {
       // Search filter
       const matchesSearch =
         searchValue === "" ||
@@ -148,21 +132,21 @@ export default function AssignmentsPage() {
         (dueDate >= dateRangeFilter.from && (!dateRangeFilter.to || dueDate <= dateRangeFilter.to))
 
       // Subscribed only filter
-      const matchesSubscribed = !subscribedOnlyFilter || assignment.courseSubscribed
+      const matchesSubscribed = !subscribedOnlyFilter /*|| assignment.courseSubscribed */
 
       return matchesSearch && matchesStatus && matchesCourse && matchesDateRange && matchesSubscribed
     })
-  }, [searchValue, statusFilter, courseFilter, dateRangeFilter, subscribedOnlyFilter])
+  }, [assignments, searchValue, statusFilter, courseFilter, dateRangeFilter, subscribedOnlyFilter])
 
   const handleNotifyTest = (assignmentId: string) => {
-    const assignment = mockAssignments.find((a) => a.id === assignmentId)
+    const assignment = assignments.find((a) => a.id === assignmentId)
     toast.success("Test notification sent", {
       description: `Sent test notification for "${assignment?.name}"`,
     })
   }
 
   const handleCreateReminder = (assignmentId: string) => {
-    const assignment = mockAssignments.find((a) => a.id === assignmentId)
+    const assignment = assignments.find((a) => a.id === assignmentId)
     toast.success("Reminder created", {
       description: `Created manual reminder for "${assignment?.name}"`,
     })

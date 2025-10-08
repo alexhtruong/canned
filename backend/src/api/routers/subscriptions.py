@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from typing import List
 import sqlalchemy
 
-from backend.src.utils.canvas import fetch_canvas_courses
+from src.utils.canvas import fetch_canvas_courses
 from src import database as db
 from src.models.subscription import (
     CourseSubscriptionRequest,

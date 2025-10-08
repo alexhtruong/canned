@@ -26,7 +26,7 @@ def fetch_courses_from_db(canvas_user_id: int):
     with db.engine.begin() as connection:
         result = connection.execute(
             sqlalchemy.text("""
-                SELECT canvas_course_id, course_name, course_code, term_id, term_name, term_start_at, is_completed
+                SELECT canvas_course_id, course_name, course_code, term_id, term_name, term_start_at, is_active
                 FROM user_courses
                 WHERE canvas_user_id = :canvas_user_id
             """),

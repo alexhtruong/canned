@@ -23,12 +23,15 @@ export default function CoursesPage() {
   const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set())
   
   const fetchCourses = async () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
-    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {
       setLoading(true);
       setError(null);
       
+      if (!apiUrl) {
+        throw new Error(`Failed to get base API URL`);
+      }
+
       const response = await fetch(`${apiUrl}/courses`, {
         headers: {
           'Content-Type': 'application/json',
@@ -40,41 +43,8 @@ export default function CoursesPage() {
       }
       
       const data = await response.json();
-
       console.log(data)
-      const isCourseActive = (startDate: string) => {
-        const currentDate = new Date();
-        const courseStartDate = new Date(startDate);
-
-        // Calculate the difference in milliseconds
-        const timeDifference = currentDate.getTime() - courseStartDate.getTime();
-
-        // Convert to weeks (1 week = 7 days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
-        const weeksDifference = timeDifference / (7 * 24 * 60 * 60 * 1000); 
-
-        return weeksDifference < 10;
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transformedCourses = data.map((course: any) => {
-        let courseStatus: "active" | "completed" = "completed"
-        const startDate = course.term?.start_at
-        if (startDate && course.id && course.course_code) {
-          const isActive = isCourseActive(startDate)
-          courseStatus = isActive ? "active" : "completed";
-        }
-
-        return {
-          id: course.id.toString(), // Convert to string if needed
-          code: course.course_code || "UNKNOWN",
-          name: course.name,
-          term: course.term, // This should now match {id: number, name: string}
-          status: courseStatus, // You'll need to determine this based on your logic
-          subscribed: false, // You'll need to get this from your subscription API
-          assignmentCount: 0, // You'll need to get this from assignments API
-          canvasUrl: `https://canvas.instructure.com/courses/${course.id}` // Construct Canvas URL
-        }
-      });
-      setCourses(transformedCourses);
+      return data
     } catch (err) {
       setError(`An unexpected error occured: ${err}`)
     } finally {
@@ -82,8 +52,49 @@ export default function CoursesPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transformCoursesFromData = (data: any[]): Course[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return data.map((course: any) => {
+      let courseStatus: "active" | "completed" | "upcoming";
+      if (course.id && course.course_code) {
+        const isActive = course.is_active
+        courseStatus = isActive ? "active" : "completed";
+      } else {
+        courseStatus = "completed"; // Default status for invalid courses
+      }
+      
+      const emptyTermObj = {
+        "id": 0,
+        "is_active": false,
+        "name": "UNKNOWN TERM",
+        "start_at": null
+      }
+      const courseTerm = course.term ? course.term : emptyTermObj
+
+      return {
+        id: course.id.toString(), // Convert to string if needed
+        code: course.course_code || "UNKNOWN",
+        name: course.name,
+        term: courseTerm, 
+        status: courseStatus, 
+        subscribed: false, // You'll need to get this from your subscription API
+        assignmentCount: 0, // You'll need to get this from assignments API
+        canvasUrl: `https://canvas.instructure.com/courses/${course.id}` // Construct Canvas URL
+      }
+      })
+    };
+
   useEffect(() => {
-    fetchCourses();
+    const loadCourses = async () => {
+      const fetchedCourses = await fetchCourses();
+      if (fetchedCourses) {
+        const transformedCourses = transformCoursesFromData(fetchedCourses);
+        setCourses(transformedCourses)
+      }
+    }
+
+    loadCourses()
   }, []);
 
   // Filter courses based on search and filters
