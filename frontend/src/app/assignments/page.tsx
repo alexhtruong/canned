@@ -61,6 +61,9 @@ export default function AssignmentsPage() {
   };
 
   const transformAssignments = (data: any[]) => {
+    if (!Array.isArray(data)) {
+      return [];
+    }
     return data.map((assignment: any) => {
       const courseCodeAndName = assignment.course_name.split(" - ", 2)
       const courseCode = courseCodeAndName[0];
