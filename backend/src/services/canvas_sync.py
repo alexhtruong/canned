@@ -177,6 +177,9 @@ def create_submission_from_data(submission_data: Dict[str, Any]) -> Optional[Sub
         return Submission(
             id=submission_data["id"],
             assignment_id=submission_data["assignment_id"],
+            score=submission_data.get("score"),
+            grade=submission_data.get("grade"),
+            submitted_at=submission_data.get("submitted_at"),
             workflow_state=submission_data["workflow_state"],
         )
     except Exception as e:
