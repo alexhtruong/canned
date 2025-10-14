@@ -4,9 +4,61 @@ import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { AssignmentTimeline } from "@/components/dashboard/assignment-timeline"
 import { AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { fetchAssignments, transformAssignments } from "@/lib/api/assignments"
+
+interface Assignment {
+  id: string
+  name: string
+  courseCode: string
+  courseName: string
+  dueDate: string
+  submitted: boolean
+  points: number
+  canvasUrl: string
+  description?: string
+}
 
 export default function DashboardPage() {
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const loadAssignments = async () => {
+      setIsLoading(true);
+      const data = await fetchAssignments();
+      if (data) {
+        setAssignments(transformAssignments(data));
+      } else {
+        setAssignments([]);
+      }
+      setIsLoading(false);
+    };
+    loadAssignments();
+  }, []);
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const dueSoonThreshold = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
+    
+    return {
+      dueSoonUnsubmitted: assignments.filter(a => {
+        const dueDate = new Date(a.dueDate);
+        return !a.submitted && dueDate > now && dueDate <= dueSoonThreshold
+      }).length,
+
+      dueSoonSubmitted: assignments.filter(a => {
+        const dueDate = new Date(a.dueDate);
+        return a.submitted && dueDate > now && dueDate <= dueSoonThreshold
+      }).length,
+
+      pastDueUnsubmitted: assignments.filter(a => {
+        const dueDate = new Date(a.dueDate);
+        return !a.submitted && dueDate < now;
+      }).length,
+    };
+  }, [assignments]);
+
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
@@ -23,15 +75,21 @@ export default function DashboardPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <StatCard
               title="Due Soon & Unsubmitted"
-              value={3}
+              value={stats.dueSoonUnsubmitted}
               subtitle="Assignments need attention"
               icon={AlertTriangle}
               variant="danger"
             />
-            <StatCard title="Due Soon & Submitted" value={7} subtitle="On track" icon={CheckCircle} variant="success" />
+            <StatCard 
+              title="Due Soon & Submitted" 
+              value={stats.dueSoonSubmitted} 
+              subtitle="On track" 
+              icon={CheckCircle} 
+              variant="success"
+            />
             <StatCard
               title="Past Due (Unsubmitted)"
-              value={1}
+              value={stats.pastDueUnsubmitted}
               subtitle="Needs immediate attention"
               icon={Clock}
               variant="warning"
@@ -40,7 +98,10 @@ export default function DashboardPage() {
 
           {/* Assignment Timeline */}
           <div className="rounded-2xl border bg-card p-6 shadow-sm">
-            <AssignmentTimeline />
+            <AssignmentTimeline 
+              assignments={assignments}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Quick Actions */}

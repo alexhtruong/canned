@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -13,7 +13,6 @@ interface Assignment {
   courseCode: string
   courseName: string
   dueDate: string
-  dueTime: string
   submitted: boolean
   canvasUrl: string
   points?: number
@@ -25,74 +24,92 @@ interface TimelineDay {
   assignments: Assignment[]
 }
 
-// Mock data - in real app this would come from API
-const mockTimelineData: TimelineDay[] = [
-  {
-    date: "2024-01-15",
-    dayName: "Today",
-    assignments: [
-      {
-        id: "1",
-        name: "Database Design Project Phase 2",
-        courseCode: "CPE-365",
-        courseName: "Database Systems",
-        dueDate: "2024-01-15",
-        dueTime: "11:59 PM",
-        submitted: false,
-        canvasUrl: "#",
-        points: 100,
-      },
-      {
-        id: "2",
-        name: "React Component Library Documentation",
-        courseCode: "CPE-308",
-        courseName: "Software Engineering",
-        dueDate: "2024-01-15",
-        dueTime: "11:59 PM",
-        submitted: true,
-        canvasUrl: "#",
-        points: 50,
-      },
-    ],
-  },
-  {
-    date: "2024-01-16",
-    dayName: "Tomorrow",
-    assignments: [
-      {
-        id: "3",
-        name: "Machine Learning Midterm",
-        courseCode: "CPE-466",
-        courseName: "Knowledge Discovery",
-        dueDate: "2024-01-16",
-        dueTime: "2:00 PM",
-        submitted: false,
-        canvasUrl: "#",
-        points: 200,
-      },
-    ],
-  },
-  {
-    date: "2024-01-18",
-    dayName: "Thursday",
-    assignments: [
-      {
-        id: "4",
-        name: "Algorithm Analysis Report",
-        courseCode: "CPE-349",
-        courseName: "Design & Analysis of Algorithms",
-        dueDate: "2024-01-18",
-        dueTime: "11:59 PM",
-        submitted: false,
-        canvasUrl: "#",
-        points: 75,
-      },
-    ],
-  },
-]
+interface AssignmentTimelineProps {
+  assignments: Assignment[];
+  isLoading?: boolean;
+}
 
-export function AssignmentTimeline() {
+function getDayName(dateString: string): string {
+  // Parse date as local time, not UTC
+  const [year, month, day] = dateString.split('-').map(Number);
+  const compareDate = new Date(year, month - 1, day); // Month is 0-indexed
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  compareDate.setHours(0, 0, 0, 0);
+  
+  const diffTime = compareDate.getTime() - today.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays === -1) return "Yesterday";
+  
+  // Return day of week for other days
+  return compareDate.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+
+function groupAssignmentsByDate(assignments: Assignment[]): TimelineDay[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + 14); // 7 days from today
+  
+  // Filter to only assignments in the next 7 days
+  const upcomingAssignments = assignments.filter(a => {
+    const dueDate = new Date(a.dueDate);
+    return dueDate >= today && dueDate < maxDate;
+  });
+  
+  // Group by date
+  const grouped = upcomingAssignments.reduce((acc, assignment) => {
+    const date = assignment.dueDate.split('T')[0]; // Get YYYY-MM-DD
+    
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(assignment);
+    return acc;
+  }, {} as Record<string, Assignment[]>);
+  
+  // Convert to array and sort by date
+  return Object.entries(grouped)
+    .map(([date, dayAssignments]) => ({
+      date,
+      dayName: getDayName(date),
+      assignments: dayAssignments.sort((a, b) => 
+        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      ),
+    }))
+    .sort((a, b) => {
+      // Sort by actual date, parsing as local time
+      const [yearA, monthA, dayA] = a.date.split('-').map(Number);
+      const [yearB, monthB, dayB] = b.date.split('-').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA);
+      const dateB = new Date(yearB, monthB - 1, dayB);
+      return dateA.getTime() - dateB.getTime();
+    });
+}
+
+export function AssignmentTimeline({ assignments, isLoading = false }: AssignmentTimelineProps) {
   const [snoozedItems, setSnoozedItems] = useState<Set<string>>(new Set())
+  
+  // Transform assignments into timeline format
+  const timelineData = useMemo(() => {
+    if (!assignments.length) return [];
+    
+    // Filter to only future/today assignments (let groupAssignmentsByDate handle 7-day limit)
+    const upcomingAssignments = assignments.filter(a => {
+      const dueDate = new Date(a.dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return dueDate >= today;
+    });
+    
+    return groupAssignmentsByDate(upcomingAssignments);
+  }, [assignments])
 
   const handleSnooze = (assignmentId: string) => {
     setSnoozedItems((prev) => new Set([...prev, assignmentId]))
@@ -102,13 +119,45 @@ export function AssignmentTimeline() {
     // In real app, this would update the assignment status
     console.log("Marking as done:", assignmentId)
   }
+  
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Upcoming Timeline</h2>
+            <p className="text-sm text-muted-foreground">Next 14 days of assignments</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+  
+  if (!timelineData.length) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Upcoming Timeline</h2>
+            <p className="text-sm text-muted-foreground">Next 14 days of assignments</p>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-muted/50 p-8 text-center">
+          <p className="text-sm text-muted-foreground">No upcoming assignments in the next 7 days</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Upcoming Timeline</h2>
-          <p className="text-sm text-muted-foreground">Next 7 days of assignments</p>
+          <p className="text-sm text-muted-foreground">Next 14 days of assignments</p>
         </div>
         <Button variant="outline" size="sm">
           <Clock className="h-4 w-4 mr-2" />
@@ -117,7 +166,7 @@ export function AssignmentTimeline() {
       </div>
 
       <div className="space-y-6">
-        {mockTimelineData.map((day) => (
+        {timelineData.map((day) => (
           <div key={day.date} className="space-y-3">
             <div className="flex items-center gap-3">
               <h3 className="font-medium text-foreground">{day.dayName}</h3>
@@ -171,7 +220,11 @@ export function AssignmentTimeline() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          Due {assignment.dueTime}
+                          Due {new Date(assignment.dueDate).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
                         </span>
                         {assignment.points && <span>{assignment.points} points</span>}
                       </div>
