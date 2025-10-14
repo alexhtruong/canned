@@ -1,6 +1,6 @@
 import html2text
 
-def strip_html_to_plaintext(html: str):
+def strip_html_to_plaintext(html: str) -> str | None:
     if not html:
         return None
     
