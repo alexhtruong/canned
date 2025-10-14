@@ -5,6 +5,7 @@ import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
 import { NotificationSettings } from "@/components/preferences/notification-settings"
 import { CanvasConnection } from "@/components/preferences/canvas-connection"
 import { DataManagement } from "@/components/preferences/data-management"
+import { getApiUrl } from "@/lib/config"
 
 export default function PreferencesPage() {
   const handleNotificationSave = (settings: any) => {
@@ -17,7 +18,7 @@ export default function PreferencesPage() {
 
   const handleSync = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/canvas/sync?canvas_user_id=1`, {
         method: 'POST',
         headers: {

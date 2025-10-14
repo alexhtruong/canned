@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/dashboard/empty-state"
 import { Button } from "@/components/ui/button"
 import { BookOpen, RefreshCw } from "lucide-react"
 import { Course } from "@/types/types"
+import { getApiUrl } from "@/lib/config"
 
 export default function CoursesPage() {
   const router = useRouter()
@@ -23,14 +24,10 @@ export default function CoursesPage() {
   const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set())
   
   const fetchCourses = async () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    const apiUrl = getApiUrl();
     try {
       setLoading(true);
       setError(null);
-      
-      if (!apiUrl) {
-        throw new Error(`Failed to get base API URL`);
-      }
 
       const response = await fetch(`${apiUrl}/courses`, {
         headers: {
