@@ -36,7 +36,7 @@ export function getApiKey(): string | undefined {
  */
 export const config = {
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || "",
+    baseUrl: process.env.NEXT_PUBLIC_API_URL,
     key: process.env.NEXT_PUBLIC_API_KEY,
   },
   // Add more config sections as needed

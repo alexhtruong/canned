@@ -146,7 +146,7 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
           </div>
         </div>
         <div className="rounded-xl border bg-muted/50 p-8 text-center">
-          <p className="text-sm text-muted-foreground">No upcoming assignments in the next 7 days</p>
+          <p className="text-sm text-muted-foreground">No upcoming assignments in the next 14 days</p>
         </div>
       </div>
     );
