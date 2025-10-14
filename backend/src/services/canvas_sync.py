@@ -7,6 +7,7 @@ structured objects that the application can use.
 from typing import List, Optional, Dict, Any
 import requests
 from src.utils.canvas import fetch_canvas_courses, fetch_canvas_assignments_for_class
+from src.utils.text import strip_html_to_plaintext
 from src.models.course import Course, Term
 from src.models.assignment import Submission, Assignment
 import sqlalchemy
@@ -124,14 +125,6 @@ def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
                 course_id = course.canvas_course_id
                 course_name = course.course_name
                 assignments = get_assignments_for_course(course_id, course_name)
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
-                # TODO: need to filter out html elements in assignment description
 
                 all_assignments.extend(assignments)
             except CanvasAPIError as e:
@@ -220,7 +213,9 @@ def create_assignment_from_data(assignment_data: Dict[str, Any], course_name: st
 
         if not submission_obj:
             return None
-
+        
+        description = assignment_data.get("description")
+        cleaned_description = strip_html_to_plaintext(description)
         return Assignment(
             id=assignment_data["id"],
             course_id=assignment_data["course_id"],
@@ -228,7 +223,7 @@ def create_assignment_from_data(assignment_data: Dict[str, Any], course_name: st
             name=assignment_data["name"],
             submission=submission_obj,
             html_url=assignment_data["html_url"],
-            description=assignment_data.get("description"),  # Optional - use .get()
+            description=cleaned_description,
             points_possible=assignment_data.get("points_possible"),  # Optional
             due_at=assignment_data.get("due_at"),  # Optional
             grading_type=assignment_data.get("grading_type")  # Optional
