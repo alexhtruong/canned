@@ -11,6 +11,7 @@ class Submission(BaseModel):
     workflow_state: str = "unsubmitted"
     late: bool = False
     missing: bool = False
+    is_locally_complete: bool = False  # User marked as done locally
 
 
 class Assignment(BaseModel):
@@ -19,6 +20,7 @@ class Assignment(BaseModel):
     course_name: str
     name: str
     submission: Submission
+    graded: bool = False
     description: Optional[str]
     points_possible: Optional[float]
     grading_type: Optional[str]   # points, not_graded, pass_fail, percent

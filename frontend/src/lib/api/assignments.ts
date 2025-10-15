@@ -34,7 +34,9 @@ export const transformAssignments = (data: any[]) => {
         courseCode: courseCode,
         courseName: courseName,
         dueDate: assignment.due_at,
+        graded: assignment.graded,
         submitted: assignment.submission.submitted_at ? true : false,
+        isLocallyComplete: assignment.submission.is_locally_complete || false,
         points: assignment.points_possible,
         canvasUrl: assignment.html_url,
         description: assignment.description

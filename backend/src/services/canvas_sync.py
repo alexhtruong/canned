@@ -151,7 +151,8 @@ def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
                         s.grade,
                         s.submitted_at,
                         s.late,
-                        s.missing
+                        s.missing,
+                        s.is_locally_complete
                     FROM user_assignments a
                     INNER JOIN user_courses c 
                         ON a.canvas_course_id = c.canvas_course_id 
@@ -180,7 +181,8 @@ def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
                 submitted_at=row.submitted_at,
                 workflow_state=row.workflow_state or "unsubmitted",
                 late=row.late or False,
-                missing=row.missing or False
+                missing=row.missing or False,
+                is_locally_complete=bool(row.is_locally_complete or False)
             )
             
             assignment = Assignment(
