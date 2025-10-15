@@ -6,14 +6,18 @@ import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Clock, ExternalLink, MoreHorizontal, CheckCircle, AlertCircle, Store as Snooze } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getApiUrl } from "@/lib/config"
+import { toast } from "sonner"
 
 interface Assignment {
   id: string
   name: string
   courseCode: string
   courseName: string
+  graded: boolean
   dueDate: string
   submitted: boolean
+  isLocallyComplete?: boolean  // User marked as done locally
   canvasUrl: string
   points?: number
 }
@@ -95,13 +99,20 @@ function groupAssignmentsByDate(assignments: Assignment[]): TimelineDay[] {
 
 export function AssignmentTimeline({ assignments, isLoading = false }: AssignmentTimelineProps) {
   const [snoozedItems, setSnoozedItems] = useState<Set<string>>(new Set())
+  const [localAssignments, setLocalAssignments] = useState<Assignment[]>(assignments)
+  const apiURL = getApiUrl();
+  
+  // Update local state when assignments prop changes
+  useMemo(() => {
+    setLocalAssignments(assignments);
+  }, [assignments]);
   
   // Transform assignments into timeline format
   const timelineData = useMemo(() => {
-    if (!assignments.length) return [];
+    if (!localAssignments.length) return [];
     
     // Filter to only future/today assignments (let groupAssignmentsByDate handle 7-day limit)
-    const upcomingAssignments = assignments.filter(a => {
+    const upcomingAssignments = localAssignments.filter(a => {
       const dueDate = new Date(a.dueDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -109,15 +120,62 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
     });
     
     return groupAssignmentsByDate(upcomingAssignments);
-  }, [assignments])
+  }, [localAssignments])
 
   const handleSnooze = (assignmentId: string) => {
     setSnoozedItems((prev) => new Set([...prev, assignmentId]))
   }
 
-  const handleMarkDone = (assignmentId: string) => {
-    // In real app, this would update the assignment status
-    console.log("Marking as done:", assignmentId)
+  const handleToggleComplete = async (assignmentId: string) => {
+    // Find current assignment state
+    const currentAssignment = localAssignments.find(a => a.id === assignmentId);
+    if (!currentAssignment) return;
+    
+    const newCompletionState = !currentAssignment.isLocallyComplete;
+    
+    // Optimistically update UI
+    setLocalAssignments(prev => 
+      prev.map(a => 
+        a.id === assignmentId 
+          ? { ...a, isLocallyComplete: newCompletionState }
+          : a
+      )
+    );
+
+    try {
+      const response = await fetch(`${apiURL}/assignments/${assignmentId}/submission`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          canvas_user_id: 1, // TODO: Get from auth context
+          is_locally_complete: newCompletionState
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to ${newCompletionState ? 'mark' : 'unmark'} assignment as done`);
+      }
+      
+      const data = await response.json();
+      console.log(`Assignment ${newCompletionState ? 'marked as done' : 'unmarked'}:`, data);
+    } catch (e) {
+      console.error(`Error toggling assignment completion:`, e);
+      
+      // Revert optimistic update on error
+      setLocalAssignments(prev => 
+        prev.map(a => 
+          a.id === assignmentId 
+            ? { ...a, isLocallyComplete: currentAssignment.isLocallyComplete }
+            : a
+        )
+      );
+      
+      toast.error("Failed to update assignment", {
+        description: `Could not ${newCompletionState ? 'mark assignment as done' : 'mark assignment as incomplete'}. Please try again.`
+      })
+    }
   }
   
   if (isLoading) {
@@ -189,6 +247,7 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
                         <Badge variant="secondary" className="font-mono text-xs">
                           {assignment.courseCode}
                         </Badge>
+                        {/* Show Canvas submission status */}
                         <Badge
                           variant={assignment.submitted ? "default" : "destructive"}
                           className={cn(
@@ -206,10 +265,21 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
                           ) : (
                             <>
                               <AlertCircle className="h-3 w-3 mr-1" />
-                              Unsubmitted
+                              Not Submitted
                             </>
                           )}
                         </Badge>
+                        
+                        {/* Show local completion status if marked as done */}
+                        {assignment.isLocallyComplete && !assignment.submitted && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Marked Done
+                          </Badge>
+                        )}
                       </div>
 
                       <div>
@@ -236,7 +306,8 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </Button>
-
+                      
+                      {!assignment.graded &&
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -248,12 +319,20 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
                             <Snooze className="h-4 w-4 mr-2" />
                             Snooze today
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMarkDone(assignment.id)}>
+                          {assignment.isLocallyComplete ? (
+                            <DropdownMenuItem onClick={() => handleToggleComplete(assignment.id)}>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark as incomplete
+                            </DropdownMenuItem>
+                          ) : (
+                          <DropdownMenuItem onClick={() => handleToggleComplete(assignment.id)}>
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Mark as done
                           </DropdownMenuItem>
+                          )}     
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      }
                     </div>
                   </div>
                 </div>

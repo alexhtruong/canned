@@ -12,6 +12,7 @@ interface Assignment {
   name: string
   courseCode: string
   courseName: string
+  graded: boolean
   dueDate: string
   submitted: boolean
   points: number
