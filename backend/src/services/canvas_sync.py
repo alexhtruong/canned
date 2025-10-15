@@ -23,9 +23,21 @@ class CanvasSyncError(Exception):
 
 # TODO: normalize the course_name into actual name and course-tag in db schema(gen chem vs CHEM-124)
 # TODO: when term ends, remove rows? or just label as disabled?
-def sync_user_assignments(canvas_user_id):
+def sync_user_assignments(canvas_user_id: int) -> Dict[str, Any]:
+    """
+    Sync user's assignments from Canvas API to database.
+    
+    Args:
+        canvas_user_id: Canvas user ID
+        
+    Returns:
+        Dict with sync statistics (synced count, total)
+        
+    Raises:
+        CanvasSyncError: If sync operation fails
+    """
     try:
-        assignments = get_assignments_for_active_courses(canvas_user_id)
+        assignments = sync_assignments_for_active_courses(canvas_user_id)
         if not assignments:
             print("No assignments found to sync")
             return {"synced": 0, "message": "No assignments found"}
@@ -47,6 +59,7 @@ def bulk_upsert_assignments(canvas_user_id: int, assignments: List[Assignment]) 
             "canvas_course_id": assignment.course_id,
             "course_name": assignment.course_name,
             "assignment_name": assignment.name,
+            "graded": assignment.graded,
             "description": assignment.description,
             "html_url": assignment.html_url,
             "points_possible": assignment.points_possible,
@@ -76,10 +89,10 @@ def bulk_upsert_assignments(canvas_user_id: int, assignments: List[Assignment]) 
             sqlalchemy.text("""
                 INSERT OR REPLACE INTO user_assignments 
                 (canvas_user_id, canvas_assignment_id, canvas_course_id, course_name,
-                 assignment_name, description, html_url, points_possible, 
+                 assignment_name, graded, description, html_url, points_possible, 
                  due_at, grading_type)
                 VALUES (:canvas_user_id, :canvas_assignment_id, :canvas_course_id, :course_name,
-                        :assignment_name, :description, :html_url, :points_possible,
+                        :assignment_name, :graded, :description, :html_url, :points_possible,
                         :due_at, :grading_type)
             """),
             assignment_records
@@ -101,7 +114,138 @@ def bulk_upsert_assignments(canvas_user_id: int, assignments: List[Assignment]) 
 
 
 def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
-    """Get assignments for all active courses from database."""
+    """
+    Get assignments for all active courses from database cache.
+    
+    This function ONLY reads from the database. Use sync_user_assignments()
+    to fetch fresh data from Canvas API.
+    
+    Args:
+        canvas_user_id: Canvas user ID
+        
+    Returns:
+        List of Assignment objects from database
+        
+    Raises:
+        CanvasSyncError: If database query fails
+    """
+    try:
+        with db.engine.begin() as connection:
+            # Query assignments with their submissions for active courses
+            results = connection.execute(
+                sqlalchemy.text("""
+                    SELECT 
+                        a.canvas_assignment_id,
+                        a.canvas_course_id,
+                        a.course_name,
+                        a.assignment_name,
+                        a.graded,
+                        a.description,
+                        a.html_url,
+                        a.points_possible,
+                        a.due_at,
+                        a.grading_type,
+                        s.canvas_submission_id,
+                        s.workflow_state,
+                        s.score,
+                        s.grade,
+                        s.submitted_at,
+                        s.late,
+                        s.missing
+                    FROM user_assignments a
+                    INNER JOIN user_courses c 
+                        ON a.canvas_course_id = c.canvas_course_id 
+                        AND a.canvas_user_id = c.canvas_user_id
+                    LEFT JOIN user_submissions s 
+                        ON a.canvas_assignment_id = s.canvas_assignment_id
+                        AND a.canvas_user_id = s.canvas_user_id
+                    WHERE a.canvas_user_id = :user_id
+                      AND c.is_active = 1
+                """),
+                {"user_id": canvas_user_id}
+            ).all()
+        
+        if not results:
+            print(f"No assignments found in database for user {canvas_user_id}")
+            return []
+        
+        # Convert database rows to Assignment objects
+        assignments = []
+        for row in results:
+            submission = Submission(
+                id=row.canvas_submission_id,
+                assignment_id=row.canvas_assignment_id,
+                score=row.score,
+                grade=row.grade,
+                submitted_at=row.submitted_at,
+                workflow_state=row.workflow_state or "unsubmitted",
+                late=row.late or False,
+                missing=row.missing or False
+            )
+            
+            assignment = Assignment(
+                id=row.canvas_assignment_id,
+                course_id=row.canvas_course_id,
+                course_name=row.course_name,
+                name=row.assignment_name,
+                submission=submission,
+                graded=row.graded,
+                html_url=row.html_url,
+                description=row.description,
+                points_possible=row.points_possible,
+                due_at=row.due_at,
+                grading_type=row.grading_type
+            )
+            assignments.append(assignment)
+        
+        print(f"Retrieved {len(assignments)} assignments from database for user {canvas_user_id}")
+        return assignments
+        
+    except Exception as e:
+        print(f"Failed to fetch assignments from database for user {canvas_user_id}: {e}")
+        raise CanvasSyncError("Failed to fetch assignments from database")
+
+def _fetch_assignments_for_course(course_id: int, course_name: str) -> List[Assignment]:
+    """
+    Fetch assignments for a single course from Canvas API (internal helper).
+    
+    Args:
+        course_id: Canvas course ID
+        course_name: Course name for assignment objects
+        
+    Returns:
+        List of Assignment objects from Canvas API
+        
+    Raises:
+        CanvasAPIError: If Canvas API request fails
+        CanvasSyncError: If data processing fails
+    """
+    try:
+        assignments, response_status = fetch_canvas_assignments_for_class(course_id)
+        return process_raw_assignments(assignments, course_name)
+    except requests.exceptions.RequestException as e:
+        print(f"Canvas API request failed for course {course_id}: {e}")
+        raise CanvasAPIError("Failed to get assignments from Canvas")
+    except Exception as e:
+        print(f"Unexpected error processing assignments for course {course_id}: {e}")
+        raise CanvasSyncError("Failed to process assignments")
+
+def sync_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
+    """
+    Fetch assignments for all active courses from Canvas API.
+    
+    This function ONLY syncs from Canvas API. Use get_assignments_for_active_courses()
+    to read from database cache.
+    
+    Args:
+        canvas_user_id: Canvas user ID
+        
+    Returns:
+        List of Assignment objects fetched from Canvas API
+        
+    Raises:
+        CanvasSyncError: If sync operation fails
+    """
     try:
         with db.engine.begin() as connection:
             active_courses = connection.execute(
@@ -118,14 +262,13 @@ def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
             print(f"No active courses found for user {canvas_user_id}")
             return []
         
-        # Fetch assignments for each active course
+        # Fetch assignments from Canvas API for each active course
         all_assignments = []
         for course in active_courses:
             try:
                 course_id = course.canvas_course_id
                 course_name = course.course_name
-                assignments = get_assignments_for_course(course_id, course_name)
-
+                assignments = _fetch_assignments_for_course(course_id, course_name)
                 all_assignments.extend(assignments)
             except CanvasAPIError as e:
                 print(f"Failed to fetch assignments for course {course_id}: {e}")
@@ -136,18 +279,6 @@ def get_assignments_for_active_courses(canvas_user_id: int) -> List[Assignment]:
     except Exception as e:
         print(f"Unexpected error fetching assignments for user {canvas_user_id}: {e}")
         raise CanvasSyncError("Failed to fetch assignments for active courses")
-
-def get_assignments_for_course(course_id: int, course_name: str) -> List[Assignment]:
-    """Get assignments for a single course from Canvas API."""
-    try:
-        assignments, response_status = fetch_canvas_assignments_for_class(course_id)
-        return process_raw_assignments(assignments, course_name)
-    except requests.exceptions.RequestException as e:
-        raise CanvasAPIError("Failed to get assignments from Canvas")
-    except Exception as e:
-        print(f"Unexpected error in get_assignments_for_course: {e}")
-        raise CanvasSyncError("Failed to process assignments")
-
 
 def process_raw_assignments(raw_assignments: List[Dict[str, Any]], course_name: str) -> List[Assignment]:
     assignment_objects = []
@@ -181,6 +312,8 @@ def create_submission_from_data(submission_data: Dict[str, Any]) -> Optional[Sub
             grade=submission_data.get("grade"),
             submitted_at=submission_data.get("submitted_at"),
             workflow_state=submission_data["workflow_state"],
+            late=submission_data.get("late", False),
+            missing=submission_data.get("missing", False)
         )
     except Exception as e:
         print(f"Error creating submission object: {e}")
@@ -188,7 +321,7 @@ def create_submission_from_data(submission_data: Dict[str, Any]) -> Optional[Sub
 
 
 def is_valid_assignment_data(assignment_data: Dict[str, Any]) -> bool:
-    required_fields = ["id", "course_id", "name", "html_url", "submission"]
+    required_fields = ["id", "course_id", "name", "html_url", "submission", "submission_types"]
     return all(assignment_data.get(field) is not None for field in required_fields)
 
 
@@ -199,7 +332,6 @@ def create_assignment_from_data(assignment_data: Dict[str, Any], course_name: st
     Args:
         assignment_data: Raw assignment data from Canvas API
         course_name: Name of the course (e.g., "General Chemistry")
-        course_code: Course code (e.g., "CHEM-124")
         
     Returns:
         Assignment object or None if validation fails
@@ -217,6 +349,9 @@ def create_assignment_from_data(assignment_data: Dict[str, Any], course_name: st
         if not submission_obj:
             return None
         
+        submission_types: List[str] = assignment_data.get("submission_types", [])
+        graded = "not_graded" not in submission_types
+
         description = assignment_data.get("description")
         cleaned_description = strip_html_to_plaintext(description)
         return Assignment(
@@ -225,20 +360,30 @@ def create_assignment_from_data(assignment_data: Dict[str, Any], course_name: st
             course_name=course_name,
             name=assignment_data["name"],
             submission=submission_obj,
+            graded=graded,
             html_url=assignment_data["html_url"],
             description=cleaned_description,
-            points_possible=assignment_data.get("points_possible"),  # Optional
-            due_at=assignment_data.get("due_at"),  # Optional
-            grading_type=assignment_data.get("grading_type")  # Optional
+            points_possible=assignment_data.get("points_possible"),
+            due_at=assignment_data.get("due_at"),
+            grading_type=assignment_data.get("grading_type")
         )
     except Exception as e:
         print(f"Error creating assignment object for {assignment_data.get('id', 'unknown')}: {e}")
         return None
 
 
-def sync_user_courses(canvas_user_id):
+def sync_user_courses(canvas_user_id: int) -> Dict[str, Any]:
     """
-    Syncs user's Canvas courses using efficient bulk operations.
+    Sync user's Canvas courses from Canvas API to database.
+    
+    Args:
+        canvas_user_id: Canvas user ID
+        
+    Returns:
+        Dict with sync statistics (synced count, total)
+        
+    Raises:
+        CanvasSyncError: If sync operation fails
     """
     try:
         courses = get_courses()
@@ -374,9 +519,17 @@ def process_raw_courses(raw_courses: List[Dict[str, Any]]) -> List[Course]:
 
 def get_courses() -> List[Course]:
     """
-    Get user's Canvas courses and format data appropriately.
+    Fetch user's Canvas courses from Canvas API.
     
-    Single responsibility: orchestration and error handling.
+    This function fetches from Canvas API. To read from database cache,
+    query user_courses table directly.
+    
+    Returns:
+        List of Course objects from Canvas API
+        
+    Raises:
+        CanvasAPIError: If Canvas API request fails
+        CanvasSyncError: If data processing fails
     """
     try:
         raw_courses, response_status = fetch_canvas_courses()
