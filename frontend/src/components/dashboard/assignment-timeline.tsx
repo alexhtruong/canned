@@ -67,9 +67,14 @@ function groupAssignmentsByDate(assignments: Assignment[]): TimelineDay[] {
     return dueDate >= today && dueDate < maxDate;
   });
   
-  // Group by date
+  // Group by date (using local timezone, not UTC)
   const grouped = upcomingAssignments.reduce((acc, assignment) => {
-    const date = assignment.dueDate.split('T')[0]; // Get YYYY-MM-DD
+    const dueDate = new Date(assignment.dueDate);
+    // Get YYYY-MM-DD in local timezone
+    const year = dueDate.getFullYear();
+    const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+    const day = String(dueDate.getDate()).padStart(2, '0');
+    const date = `${year}-${month}-${day}`;
     
     if (!acc[date]) {
       acc[date] = [];

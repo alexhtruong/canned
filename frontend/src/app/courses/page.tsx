@@ -72,12 +72,11 @@ export default function CoursesPage() {
       return {
         id: course.id.toString(), // Convert to string if needed
         code: course.course_code || "UNKNOWN",
-        name: course.name,
+        name: course.name.split(" - ")[1],
         term: courseTerm, 
         status: courseStatus, 
         subscribed: false, // You'll need to get this from your subscription API
-        assignmentCount: 0, // You'll need to get this from assignments API
-        canvasUrl: `https://canvas.instructure.com/courses/${course.id}` // Construct Canvas URL
+        canvasUrl: `https://canvas.calpoly.edu/courses/${course.id}` // Construct Canvas URL
       }
       })
     };

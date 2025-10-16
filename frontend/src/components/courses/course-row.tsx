@@ -52,7 +52,6 @@ export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: C
             <h3 className="font-medium text-foreground truncate">{course.name}</h3>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{course.term?.name}</span>
-              <span>{course.assignmentCount} assignments</span>
             </div>
           </div>
         </div>
