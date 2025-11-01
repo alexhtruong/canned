@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Dict, Any
 from pydantic import BaseModel
 import sqlalchemy
-from sqlalchemy.sql.sqltypes import BOOLEANTYPE
 import logging
 
 from src.utils.canvas import fetch_canvas_courses
