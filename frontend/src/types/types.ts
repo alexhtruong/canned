@@ -11,6 +11,5 @@ export interface Course {
   term: Term
   status: "active" | "completed" | "upcoming"
   subscribed: boolean
-  assignmentCount: number
   canvasUrl: string
 }
