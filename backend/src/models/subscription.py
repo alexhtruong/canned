@@ -6,8 +6,7 @@ from pydantic import BaseModel, Field
 
 class CourseSubscriptionRequest(BaseModel):
     """Request model for subscribing to a course."""
-    canvas_course_id: int = Field(gt=0, description="Canvas course ID to subscribe to")
-
+    canvas_user_id: int
 
 class CourseSubscriptionResponse(BaseModel):
     """Response model for course subscription operations."""

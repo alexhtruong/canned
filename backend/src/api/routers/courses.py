@@ -1,26 +1,35 @@
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict, Any
 from src.models.course import Course, Term
+from src.auth import verify_api_key
 import src.database as db
 import sqlalchemy
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
+
 @router.get("", response_model=List[Course])
-async def get_courses(canvas_user_id: int = 1) -> List[Course]:
+async def get_courses(
+    auth_info: Dict[str, Any] = Depends(verify_api_key),
+) -> List[Course]:
     """
     Get's the user's canvas courses from the local db
     """
+    canvas_user_id = auth_info["user_id"]
     try:
         denormalized_courses = fetch_courses_from_db(canvas_user_id)
         if not denormalized_courses:
             return []
-        
+
         normalized_courses = normalize_courses(denormalized_courses)
         return normalized_courses
     except Exception as e:
-        print(f"Database error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve courses")    
+        logger.error(f"Database error fetching courses for user {canvas_user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve courses")
+
 
 def fetch_courses_from_db(canvas_user_id: int):
     with db.engine.begin() as connection:
@@ -30,30 +39,29 @@ def fetch_courses_from_db(canvas_user_id: int):
                 FROM user_courses
                 WHERE canvas_user_id = :canvas_user_id
             """),
-            {"canvas_user_id": canvas_user_id}
+            {"canvas_user_id": canvas_user_id},
         ).all()
-        
+
         return result
+
 
 def normalize_courses(courses) -> List[Course]:
     """Transform database rows into Course objects."""
     result = []
-    
+
     for course in courses:
         term = None
         if course.term_id:
             term = Term(
-                id=course.term_id,
-                name=course.term_name,
-                start_at=course.term_start_at
+                id=course.term_id, name=course.term_name, start_at=course.term_start_at
             )
-        
+
         course_obj = Course(
             id=course.canvas_course_id,
             name=course.course_name,
             course_code=course.course_code,
-            term=term
+            term=term,
         )
         result.append(course_obj)
-    
+
     return result

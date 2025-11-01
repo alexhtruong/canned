@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { BookOpen, ExternalLink, MoreHorizontal, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Course } from "@/types/types"
+import { getApiUrl } from "@/lib/config"
 
 interface CourseRowProps {
   course: Course
@@ -23,13 +24,41 @@ const statusStyles = {
 
 export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: CourseRowProps) {
   const [isUpdating, setIsUpdating] = useState(false)
+  const apiURL = getApiUrl();
 
   const handleSubscriptionToggle = async (checked: boolean) => {
-    setIsUpdating(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onSubscriptionChange(course.id, checked)
-    setIsUpdating(false)
+    try {
+      setIsUpdating(true)
+      if (checked) {
+        const response = await fetch(`${apiURL}/subscriptions/courses/${course.id}`, {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            "canvas_user_id": 1
+          })
+        });
+        const data = await response.json();
+        console.log(data);
+      } else {
+        const response = await fetch(`${apiURL}/subscriptions/courses/${course.id}?canvas_user_id=1`, {
+          method: "DELETE",
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await response.json();
+        console.log(data);
+      }
+      onSubscriptionChange(course.id, checked)
+      setIsUpdating(false)
+    } catch (e) {
+      console.error(e)
+      // implement toast
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   return (

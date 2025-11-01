@@ -1,49 +1,37 @@
-"use client"
+"use client";
 
-import { TopNav } from "@/components/layout/top-nav"
-import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav"
-import { NotificationSettings } from "@/components/preferences/notification-settings"
-import { CanvasConnection } from "@/components/preferences/canvas-connection"
-import { DataManagement } from "@/components/preferences/data-management"
-import { getApiUrl } from "@/lib/config"
+import { TopNav } from "@/components/layout/top-nav";
+import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
+import { NotificationSettings } from "@/components/preferences/notification-settings";
+import { CanvasConnection } from "@/components/preferences/canvas-connection";
+import { DataManagement } from "@/components/preferences/data-management";
+import { canvasApi } from "@/lib/api";
 
 export default function PreferencesPage() {
   const handleNotificationSave = (settings: any) => {
-    console.log("Saving notification settings:", settings)
-  }
+    console.log("Saving notification settings:", settings);
+  };
 
   const handleCanvasSave = (settings: any) => {
-    console.log("Saving Canvas settings:", settings)
-  }
+    console.log("Saving Canvas settings:", settings);
+  };
 
   const handleSync = async () => {
     try {
-      const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/canvas/sync?canvas_user_id=1`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log(data)
+      const data = await canvasApi.sync();
+      console.log(data);
     } catch (e) {
       console.error(e);
     }
-  }
+  };
 
   const handleRescheduleJobs = () => {
-    console.log("Rescheduling notification jobs")
-  }
+    console.log("Rescheduling notification jobs");
+  };
 
   const handleClearCache = () => {
-    console.log("Clearing cache")
-  }
+    console.log("Clearing cache");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -53,9 +41,12 @@ export default function PreferencesPage() {
         <div className="space-y-6">
           {/* Header */}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-balance">Preferences</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-balance">
+              Preferences
+            </h1>
             <p className="text-muted-foreground text-pretty">
-              Configure your notification settings, Canvas connection, and data management
+              Configure your notification settings, Canvas connection, and data
+              management
             </p>
           </div>
 
@@ -72,5 +63,5 @@ export default function PreferencesPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
