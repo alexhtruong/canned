@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_api_key_to_user_mapping() -> [str, Dict[str, Any]]:
+def get_api_key_to_user_mapping() -> Dict[str, Dict[str, Any]]:
     allowed_keys = os.getenv("ALLOWED_API_KEYS", "").strip()
     if not allowed_keys:
         raise ValueError("ALLOWED_API_KEYS environment variable not set")
