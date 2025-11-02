@@ -51,7 +51,7 @@ export default function CoursesPage() {
         const isActive = course.is_active;
         courseStatus = isActive ? "active" : "completed";
       } else {
-        courseStatus = "completed"; // Default status for invalid courses
+        courseStatus = "completed";
       }
 
       const emptyTermObj = {
@@ -63,13 +63,13 @@ export default function CoursesPage() {
       const courseTerm = course.term ? course.term : emptyTermObj;
 
       return {
-        id: course.id.toString(), // Convert to string if needed
+        id: course.id.toString(),
         code: course.course_code || "UNKNOWN",
         name: course.name.split(" - ")[1],
         term: courseTerm,
         status: courseStatus,
-        subscribed: false, // You'll need to get this from your subscription API
-        canvasUrl: `https://canvas.calpoly.edu/courses/${course.id}`, // Construct Canvas URL
+        subscribed: course.is_subscribed || false,   
+        canvasUrl: `https://canvas.calpoly.edu/courses/${course.id}`,
       };
     });
   };

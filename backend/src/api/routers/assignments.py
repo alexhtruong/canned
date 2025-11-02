@@ -27,7 +27,7 @@ class AssignmentServiceError(Exception):
 
 @router.get("")
 def get_assignments(
-    auth_info: Dict[str, any] = Depends(verify_api_key),
+    auth_info: Dict[str, Any] = Depends(verify_api_key),
 ):
     canvas_user_id = auth_info["user_id"]
     assignments: List[Assignment] = get_assignments_for_active_courses(canvas_user_id)
@@ -38,7 +38,7 @@ def get_assignments(
 def update_assignment_submission(
     assignment_id: int,
     request: SubmissionUpdateRequest,
-    auth_info: Dict[str, any] = Depends(verify_api_key),
+    auth_info: Dict[str, Any] = Depends(verify_api_key),
 ) -> Dict[str, Any]:
     """
     Update assignment submission status (locally tracked, not synced to Canvas).
@@ -131,8 +131,9 @@ def update_assignment_submission(
                 "is_locally_complete": bool(result.is_locally_complete),
                 "locally_completed_at": result.locally_completed_at,
             }
+            
     except AssignmentServiceError as e:
-        print(f"Failed to mark assignment {assignment_id} as done: {e}")
+        logger.error(f"Failed to mark assignment {assignment_id} as done: {e}")
         raise HTTPException(
             status_code=404 if "not found" in str(e).lower() else 500,
             detail="Failed to update assignment",

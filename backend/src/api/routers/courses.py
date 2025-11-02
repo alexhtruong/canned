@@ -35,7 +35,7 @@ def fetch_courses_from_db(canvas_user_id: int):
     with db.engine.begin() as connection:
         result = connection.execute(
             sqlalchemy.text("""
-                SELECT canvas_course_id, course_name, course_code, term_id, term_name, term_start_at, is_active
+                SELECT canvas_course_id, course_name, course_code, term_id, term_name, term_start_at, is_active, is_subscribed
                 FROM user_courses
                 WHERE canvas_user_id = :canvas_user_id
             """),
@@ -61,7 +61,20 @@ def normalize_courses(courses) -> List[Course]:
             name=course.course_name,
             course_code=course.course_code,
             term=term,
+            is_subscribed=course.is_subscribed
         )
         result.append(course_obj)
 
     return result
+
+def get_course_info(canvas_user_id: int, canvas_course_id: int):
+    with db.engine.begin() as connection:
+        result = connection.execute(
+            sqlalchemy.text("""
+                SELECT course_name, course_code, is_subscribed
+                FROM user_courses
+                WHERE canvas_user_id = :user_id AND canvas_course_id = :course_id
+            """),
+            {"user_id": canvas_user_id, "course_id": canvas_course_id},
+        ).first()
+        return result

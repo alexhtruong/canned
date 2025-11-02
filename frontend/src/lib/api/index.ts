@@ -76,10 +76,10 @@ export const subscriptionsApi = {
       method: 'DELETE',
     }),
 
-  toggle: (courseId: number, isActive: boolean) =>
+  toggle: (courseId: number, is_subscribed: boolean) =>
     apiRequest(`/subscriptions/courses/${courseId}`, {
       method: 'PUT',
-      body: JSON.stringify({ is_active: isActive }),
+      body: JSON.stringify({ is_subscribed: is_subscribed }),
     }),
 };
 
