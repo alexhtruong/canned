@@ -36,7 +36,7 @@ def toggle_subscription(
     user_id = auth_info["user_id"]
     try:
         with db.engine.begin() as connection:
-            course_info = get_course_info(user_id, course_id)
+            course_info = get_course_info(user_id, course_id, connection)
             if not course_info:
                 raise HTTPException(404, "Course not found")
             

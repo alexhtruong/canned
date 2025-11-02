@@ -8,7 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { BookOpen, ExternalLink, MoreHorizontal, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Course } from "@/types/types"
-import { getApiUrl } from "@/lib/config"
 import { subscriptionsApi } from "@/lib/api"
 
 interface CourseRowProps {

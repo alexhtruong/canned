@@ -1,5 +1,8 @@
+from sqlite3 import Cursor
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
+
+from sqlalchemy.engine import Connection
 from src.models.course import Course, Term
 from src.auth import verify_api_key
 import src.database as db
@@ -16,7 +19,7 @@ async def get_courses(
     auth_info: Dict[str, Any] = Depends(verify_api_key),
 ) -> List[Course]:
     """
-    Get's the user's canvas courses from the local db
+    Gets the user's canvas courses from the local db
     """
     canvas_user_id = auth_info["user_id"]
     try:
@@ -67,14 +70,14 @@ def normalize_courses(courses) -> List[Course]:
 
     return result
 
-def get_course_info(canvas_user_id: int, canvas_course_id: int):
-    with db.engine.begin() as connection:
-        result = connection.execute(
-            sqlalchemy.text("""
-                SELECT course_name, course_code, is_subscribed
-                FROM user_courses
-                WHERE canvas_user_id = :user_id AND canvas_course_id = :course_id
-            """),
-            {"user_id": canvas_user_id, "course_id": canvas_course_id},
-        ).first()
-        return result
+def get_course_info(canvas_user_id: int, canvas_course_id: int, connection: Connection):
+    """Fetches the course name, code, subscription status from the database."""
+    result = connection.execute(
+        sqlalchemy.text("""
+            SELECT course_name, course_code, is_subscribed
+            FROM user_courses
+            WHERE canvas_user_id = :user_id AND canvas_course_id = :course_id
+        """),
+        {"user_id": canvas_user_id, "course_id": canvas_course_id},
+    ).first()
+    return result
