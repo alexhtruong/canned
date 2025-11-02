@@ -65,7 +65,7 @@ export default function CoursesPage() {
       return {
         id: course.id.toString(),
         code: course.course_code || "UNKNOWN",
-        name: course.name.split(" - ")[1],
+        name: course.name.split(" - ")[1] || course.name,
         term: courseTerm,
         status: courseStatus,
         subscribed: course.is_subscribed || false,   
