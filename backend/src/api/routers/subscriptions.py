@@ -67,7 +67,7 @@ def toggle_subscription(
             
             return ToggleSubscriptionResponse(
                 canvas_course_id=course_id,
-                is_subscribed=course_info.is_subscribed,
+                is_subscribed=request.is_subscribed,
                 course_code=course_info.course_code,
                 course_name=course_info.course_name
             )
