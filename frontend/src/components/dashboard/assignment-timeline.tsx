@@ -8,6 +8,7 @@ import { Clock, ExternalLink, MoreHorizontal, CheckCircle, AlertCircle, Store as
 import { cn } from "@/lib/utils"
 import { getApiUrl } from "@/lib/config"
 import { toast } from "sonner"
+import { assignmentsApi } from "@/lib/api"
 
 interface Assignment {
   id: string
@@ -67,9 +68,14 @@ function groupAssignmentsByDate(assignments: Assignment[]): TimelineDay[] {
     return dueDate >= today && dueDate < maxDate;
   });
   
-  // Group by date
+  // Group by date (using local timezone, not UTC)
   const grouped = upcomingAssignments.reduce((acc, assignment) => {
-    const date = assignment.dueDate.split('T')[0]; // Get YYYY-MM-DD
+    const dueDate = new Date(assignment.dueDate);
+    // Get YYYY-MM-DD in local timezone
+    const year = dueDate.getFullYear();
+    const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+    const day = String(dueDate.getDate()).padStart(2, '0');
+    const date = `${year}-${month}-${day}`;
     
     if (!acc[date]) {
       acc[date] = [];
@@ -143,22 +149,7 @@ export function AssignmentTimeline({ assignments, isLoading = false }: Assignmen
     );
 
     try {
-      const response = await fetch(`${apiURL}/assignments/${assignmentId}/submission`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          canvas_user_id: 1, // TODO: Get from auth context
-          is_locally_complete: newCompletionState
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to ${newCompletionState ? 'mark' : 'unmark'} assignment as done`);
-      }
-      
-      const data = await response.json();
+      const data = await assignmentsApi.updateSubmission(parseInt(assignmentId), newCompletionState)
       console.log(`Assignment ${newCompletionState ? 'marked as done' : 'unmarked'}:`, data);
     } catch (e) {
       console.error(`Error toggling assignment completion:`, e);

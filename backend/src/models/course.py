@@ -25,6 +25,7 @@ class Course(BaseModel):
     name: str = "Unnamed Course"
     course_code: str = "UNKNOWN"
     term: Optional[Term] = None
+    is_subscribed: bool = False
 
     @computed_field
     @property

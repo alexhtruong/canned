@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { BookOpen, ExternalLink, MoreHorizontal, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Course } from "@/types/types"
+import { subscriptionsApi } from "@/lib/api"
 
 interface CourseRowProps {
   course: Course
@@ -23,13 +24,20 @@ const statusStyles = {
 
 export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: CourseRowProps) {
   const [isUpdating, setIsUpdating] = useState(false)
-
+  
   const handleSubscriptionToggle = async (checked: boolean) => {
-    setIsUpdating(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onSubscriptionChange(course.id, checked)
-    setIsUpdating(false)
+    try {
+      setIsUpdating(true)
+      const courseIdAsNum = parseInt(course.id)
+      const data = await subscriptionsApi.toggle(courseIdAsNum, checked)
+      console.log(data);
+      onSubscriptionChange(course.id, checked)
+    } catch (e) {
+      console.error(e)
+      // implement toast
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   return (
@@ -52,7 +60,6 @@ export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: C
             <h3 className="font-medium text-foreground truncate">{course.name}</h3>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{course.term?.name}</span>
-              <span>{course.assignmentCount} assignments</span>
             </div>
           </div>
         </div>
