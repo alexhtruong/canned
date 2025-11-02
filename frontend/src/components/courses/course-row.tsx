@@ -30,7 +30,7 @@ export function CourseRow({ course, onSubscriptionChange, onViewAssignments }: C
     try {
       setIsUpdating(true)
       const courseIdAsNum = parseInt(course.id)
-      const data = await subscriptionsApi.toggle(courseIdAsNum, !checked)
+      const data = await subscriptionsApi.toggle(courseIdAsNum, checked)
       console.log(data);
       onSubscriptionChange(course.id, checked)
     } catch (e) {
